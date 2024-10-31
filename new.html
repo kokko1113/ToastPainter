@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>トースト焼き加減判別プログラム</title>
+</head>
+<body>
+    <h3>トースト焼き加減判別プログラム</h3>
+    <button type="button" onclick="init()">撮影開始</button>
+    <div id="webcam-container"></div>
+    <div id="label-container"></div>
+    <div id="status-container"></div> <!-- たべごろの表示エリア -->
+
+    <!-- TensorFlow.jsとTeachable Machineライブラリの読み込み -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
+
+    <script type="text/javascript">
+        // Teachable Machineから提供されたモデルのURL
+        const URL = "https://teachablemachine.withgoogle.com/models/dXuKtLExK/";
+
+        let model, webcam, labelContainer, maxPredictions;
+
+        // 画像モデルのロードとWebカメラのセットアップ
+        async function init() {
+            const modelURL = URL + "model.json";
+            const metadataURL = URL + "metadata.json";
+
+            // モデルとメタデータのロード
+            model = await tmImage.load(modelURL, metadataURL);
+            maxPredictions = model.getTotalClasses();
+
+            // Webカメラのセットアップ
+            const flip = true; // Webカメラを左右反転
+            webcam = new tmImage.Webcam(200, 200, flip); // 幅200px、高さ200px、反転あり
+            await webcam.setup(); // Webカメラへのアクセス許可
+            await webcam.play();
+            window.requestAnimationFrame(loop);
+
+            // DOMへの要素の追加
+            document.getElementById("webcam-container").appendChild(webcam.canvas);
+            labelContainer = document.getElementById("label-container");
+            for (let i = 0; i < maxPredictions; i++) {
+                labelContainer.appendChild(document.createElement("div"));
+            }
+        }
+
+        async function loop() {
+            webcam.update(); // Webカメラのフレームを更新
+            await predict();
+            window.requestAnimationFrame(loop);
+        }
+
+        // Webカメラ画像を画像モデルで分類
+        async function predict() {
+            const prediction = await model.predict(webcam.canvas);
+            let isTabeGoro = false; // たべごろフラグ
+
+            for (let i = 0; i < maxPredictions; i++) {
+                const classPrediction = 
+                    prediction[i].className + ": " + prediction[i].probability.toFixed(2);
+                labelContainer.childNodes[i].innerHTML = classPrediction;
+
+                // 2番目のラベル（例: "ok"）が80%以上の場合、たべごろメッセージを表示
+                if (prediction[i].className === "ok" && prediction[i].probability >= 0.8) {
+                    isTabeGoro = true;
+                }
+            }
+
+            // 条件に応じて「たべごろです」と表示
+            const statusContainer = document.getElementById("status-container");
+            statusContainer.innerHTML = isTabeGoro ? "たべごろです！" : "";
+        }
+    </script>
+</body>
+</html>
